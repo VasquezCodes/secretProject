@@ -47,7 +47,7 @@ export function Premio({
         className="text-papel/60 hover:text-papel absolute left-4 top-5 z-10 flex cursor-pointer items-center gap-1 rounded-full py-2 pl-2 pr-3 text-sm transition-colors"
       >
         <ArrowLeft size={18} />
-        Volver a la carta
+        Volver
       </button>
 
       <motion.div

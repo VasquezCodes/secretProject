@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 import Image from "next/image";
 
@@ -18,11 +19,14 @@ export function Carta({
   numeroDeCumplemes,
   puedeGirar,
   onContinuar,
+  onVolver,
 }: {
   tiempo: TiempoJuntos;
   numeroDeCumplemes: number;
   puedeGirar: boolean;
   onContinuar: () => void;
+  /** Ausente la primera vez: todavía no hay hub al que volver. */
+  onVolver?: () => void;
 }) {
   const reducirMovimiento = useReducedMotion();
 
@@ -34,6 +38,17 @@ export function Carta({
   return (
     <section className="bg-papel relative flex min-h-dvh flex-col items-center justify-center overflow-hidden px-3 py-14 sm:px-5">
       <Corazones />
+
+      {onVolver && (
+        <button
+          type="button"
+          onClick={onVolver}
+          className="text-humo hover:text-tinta absolute left-3 top-4 z-10 flex cursor-pointer items-center gap-1 rounded-full py-2 pl-2 pr-3 text-sm transition-colors"
+        >
+          <ArrowLeft size={18} />
+          Volver
+        </button>
+      )}
 
       <motion.article
         initial={reducirMovimiento ? false : { opacity: 0, y: 26 }}

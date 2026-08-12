@@ -113,13 +113,43 @@ calculan fechas ni sortean: reciben resultados ya computados.
 
 ### Máquina de estados
 
-`page.tsx` mantiene una etapa: `"sobre" | "carta" | "ruleta" | "cupon"`.
+`page.tsx` mantiene una etapa: `"sobre" | "hub" | "carta" | "ruleta" | "premio"`.
 
-- `sobre` → `carta`: ella toca el sobre.
-- `carta` → `ruleta`: ella toca "Girar la ruleta". Solo se ofrece si el ciclo actual está desbloqueado.
-- `ruleta` → `premio`: termina la animación y el premio queda confirmado.
-- Si el ciclo actual **ya fue jugado**, al abrir la app va directo de `sobre` → `carta` → `premio`
-  (con historial y cuenta regresiva), sin pasar por `ruleta`.
+**El sobre significa que hay algo nuevo dentro.** No aparece en cada visita: si ya jugó el giro de
+este ciclo no hay nada que abrir y entra directa al hub. Cuando llega el 12 siguiente, el sobre
+vuelve solo.
+
+| Situación | Entra en | Y el sobre lleva a |
+|---|---|---|
+| Nunca giró | `sobre` | `carta` (la secuencia del primer mes, intacta) |
+| Ya giró antes, ciclo nuevo abierto | `sobre` | `hub` |
+| Ya giró este ciclo | `hub` | (no se muestra) |
+
+Navegación:
+
+- `hub` → `ruleta` si hay giro disponible, o → `premio` si ya jugó. Es el mismo toque sobre la rueda:
+  ella no tiene que saber en qué estado está.
+- `hub` → `carta`, tocando la tarjeta de papel.
+- `carta` → `ruleta` / `premio` con su botón principal.
+- `ruleta` → `premio` al confirmarse el resultado.
+- **Volver** desde cualquier pantalla lleva al `hub`. Única excepción: antes del primer giro, cuando
+  el hub todavía no significa nada para ella y Volver la devuelve a la carta.
+
+### El hub
+
+No es un menú de tarjetas iguales. Es una mesa con sus cosas encima:
+
+- **La rueda en miniatura**, dibujada con la misma geometría que la de verdad (`lib/rueda.ts`), así
+  que las dos se mueven juntas al agregar citas. Gira despacio solo cuando hay un giro esperando: eso
+  no es decoración, es la señal de que le toca. Si ya jugó se queda quieta, con su gajo encendido y
+  el icono a la vista, aparcada bajo la lengüeta como quedó al parar.
+- **La carta**, una tarjeta de papel ladeada con sus primeras líneas asomando. Se endereza al pasar
+  por encima.
+- **Tus citas**, una fila de fichas: llenas con su icono las descubiertas, punteadas con `?` las que
+  faltan. Eso es lo que crece mes a mes, y a la larga pesa más que cualquier giro suelto.
+
+La carta es la del primer mes. Si más adelante se quiere una carta nueva cada mes, el punto de
+extensión es `CARTA` en `contenido.ts`, que hoy es un único texto.
 
 ## Módulos
 

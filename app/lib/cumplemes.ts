@@ -17,6 +17,27 @@ function dosDigitos(n: number): string {
   return n < 10 ? `0${n}` : String(n);
 }
 
+export const NOMBRES_DE_MES = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+] as const;
+
+/** El mes de un id de ciclo ("2026-08" da "agosto"). */
+export function nombreDeMesDeCiclo(ciclo: string): string {
+  const mes = Number(ciclo.slice(5, 7));
+  return NOMBRES_DE_MES[mes - 1] ?? ciclo;
+}
+
 /**
  * Identificador del ciclo vigente, con formato "AAAA-MM".
  *

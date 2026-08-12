@@ -1,28 +1,8 @@
 import { CITAS } from "../contenido";
 import { IconoCita } from "../iconos";
 import type { Giro } from "../lib/almacenamiento";
+import { nombreDeMesDeCiclo } from "../lib/cumplemes";
 import { citaPorId } from "../lib/premios";
-
-const MESES = [
-  "enero",
-  "febrero",
-  "marzo",
-  "abril",
-  "mayo",
-  "junio",
-  "julio",
-  "agosto",
-  "septiembre",
-  "octubre",
-  "noviembre",
-  "diciembre",
-];
-
-/** "2026-08" se lee como "agosto". */
-function nombreDeCiclo(ciclo: string): string {
-  const mes = Number(ciclo.slice(5, 7));
-  return MESES[mes - 1] ?? ciclo;
-}
 
 /**
  * Las citas de los meses anteriores. Se muestra solo a partir del segundo
@@ -59,7 +39,7 @@ export function Historial({ giros }: { giros: readonly Giro[] }) {
                 {cita.titulo}
               </span>
               <span className="text-papel/55 text-[12px]">
-                {nombreDeCiclo(giro.ciclo)}
+                {nombreDeMesDeCiclo(giro.ciclo)}
               </span>
             </li>
           );

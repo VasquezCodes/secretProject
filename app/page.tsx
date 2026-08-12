@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useCallback, useState, useSyncExternalStore } from "react";
 
 import { Carta } from "./components/Carta";
+import { Hub } from "./components/Hub";
 import { Premio } from "./components/Premio";
 import { Ruleta } from "./components/Ruleta";
 import { Sobre } from "./components/Sobre";
@@ -26,13 +27,13 @@ import {
 import { citaPorId } from "./lib/premios";
 import { parametroDeDesarrollo, useAhora } from "./lib/reloj";
 
-type Etapa = "sobre" | "carta" | "ruleta" | "premio";
+type Etapa = "sobre" | "hub" | "carta" | "ruleta" | "premio";
 
-const ETAPAS: Etapa[] = ["sobre", "carta", "ruleta", "premio"];
+const ETAPAS: Etapa[] = ["sobre", "hub", "carta", "ruleta", "premio"];
 
-function etapaInicial(): Etapa {
-  const forzada = parametroDeDesarrollo("etapa");
-  return ETAPAS.includes(forzada as Etapa) ? (forzada as Etapa) : "sobre";
+function etapaForzada(): Etapa | null {
+  const pedida = parametroDeDesarrollo("etapa");
+  return ETAPAS.includes(pedida as Etapa) ? (pedida as Etapa) : null;
 }
 
 export default function Pagina() {
@@ -43,47 +44,39 @@ export default function Pagina() {
     instantaneaServidor,
   );
 
-  // Seguro leerlo en la inicialización: hasta que llega el reloj se dibuja el
-  // sobre igual que en el servidor, así que la hidratación cuadra.
-  const [etapa, setEtapa] = useState<Etapa>(etapaInicial);
-
-  // Solo en desarrollo: `?cita=<id>` deja mirar la pantalla de premio sin
-  // tener que jugar un giro entero.
+  // `null` significa "todavía no eligió": se usa la entrada que corresponda
+  // según lo que haya jugado. Cualquier navegación posterior fija una etapa.
+  const [etapaElegida, setEtapaElegida] = useState<Etapa | null>(etapaForzada);
   const [citaForzada] = useState(() => parametroDeDesarrollo("cita"));
-
-  const listo = ahora !== null;
 
   const confirmar = useCallback(
     (cita: Cita) => {
       if (!ahora) return;
 
-      const ciclo = idDeCiclo(ahora, DIA_CUMPLEMES);
-
       guardar(
         registrarGiro(estado, {
-          ciclo,
+          ciclo: idDeCiclo(ahora, DIA_CUMPLEMES),
           citaId: cita.id,
           fechaISO: ahora.toISOString(),
         }),
       );
 
-      setEtapa("premio");
+      setEtapaElegida("premio");
     },
     [ahora, estado],
   );
 
-  // El sobre no depende del reloj, así que puede renderizarse antes de que
-  // el cliente sepa qué hora es.
-  if (!listo || etapa === "sobre") {
-    return (
-      <main>
-        <Sobre onAbrir={() => setEtapa("carta")} />
-      </main>
-    );
+  // Hasta que el cliente sabe qué hora es no se puede decidir nada. Se pinta
+  // el fondo a secas, igual que en el servidor, para no parpadear una pantalla
+  // que enseguida sería reemplazada por otra.
+  if (!ahora) {
+    return <main className="bg-noche min-h-dvh" />;
   }
 
   const inicio = fechaDeInicio();
   const ciclo = idDeCiclo(ahora, DIA_CUMPLEMES);
+  const cumplemes = numeroDeCumplemes(inicio, ahora);
+
   const giroDeEsteCiclo = giroDelCiclo(estado, ciclo);
   const citaGanada = giroDeEsteCiclo
     ? citaPorId(CITAS, giroDeEsteCiclo.citaId)
@@ -94,8 +87,16 @@ export default function Pagina() {
   // Si la cita guardada ya no existe en contenido.ts, se le devuelve el giro
   // en vez de dejarla mirando una pantalla rota.
   const puedeGirar = !giroDeEsteCiclo || !citaGanada;
+  const haGirado = estado.giros.length > 0;
 
-  const historialPrevio = estado.giros.filter((giro) => giro.ciclo !== ciclo);
+  /*
+   * El sobre pasó a significar algo: se abre cuando hay un mes nuevo dentro.
+   * Si ya giró lo de este ciclo, no hay nada que abrir y entra directa al hub.
+   */
+  const etapa: Etapa = etapaElegida ?? (giroDeEsteCiclo ? "hub" : "sobre");
+
+  const alVolver = () => setEtapaElegida(haGirado ? "hub" : "carta");
+  const alJugar = () => setEtapaElegida(puedeGirar ? "ruleta" : "premio");
 
   return (
     <main>
@@ -107,21 +108,40 @@ export default function Pagina() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
         >
+          {etapa === "sobre" && (
+            <Sobre
+              onAbrir={() => setEtapaElegida(haGirado ? "hub" : "carta")}
+            />
+          )}
+
+          {etapa === "hub" && (
+            <Hub
+              citas={CITAS}
+              giros={estado.giros}
+              citaDeEsteCiclo={citaGanada ?? null}
+              ciclo={ciclo}
+              numeroDeCumplemes={cumplemes}
+              onRuleta={alJugar}
+              onCarta={() => setEtapaElegida("carta")}
+            />
+          )}
+
           {etapa === "carta" && (
             <Carta
               tiempo={tiempoJuntos(inicio, ahora)}
-              numeroDeCumplemes={numeroDeCumplemes(inicio, ahora)}
+              numeroDeCumplemes={cumplemes}
               puedeGirar={puedeGirar}
-              onContinuar={() => setEtapa(puedeGirar ? "ruleta" : "premio")}
+              onContinuar={alJugar}
+              onVolver={haGirado ? () => setEtapaElegida("hub") : undefined}
             />
           )}
 
           {etapa === "ruleta" && (
             <Ruleta
               citas={CITAS}
-              historial={historialPrevio}
+              historial={estado.giros.filter((giro) => giro.ciclo !== ciclo)}
               onConfirmado={confirmar}
-              onVolver={() => setEtapa("carta")}
+              onVolver={alVolver}
             />
           )}
 
@@ -129,20 +149,17 @@ export default function Pagina() {
             (citaGanada ? (
               <Premio
                 cita={citaGanada}
-                numeroDeCumplemes={numeroDeCumplemes(inicio, ahora)}
-                historial={historialPrevio}
-                faltan={faltaPara(
-                  proximoCumplemes(ahora, DIA_CUMPLEMES),
-                  ahora,
-                )}
-                onVolver={() => setEtapa("carta")}
+                numeroDeCumplemes={cumplemes}
+                historial={estado.giros.filter((giro) => giro.ciclo !== ciclo)}
+                faltan={faltaPara(proximoCumplemes(ahora, DIA_CUMPLEMES), ahora)}
+                onVolver={() => setEtapaElegida("hub")}
               />
             ) : (
               <Ruleta
                 citas={CITAS}
-                historial={historialPrevio}
+                historial={estado.giros.filter((giro) => giro.ciclo !== ciclo)}
                 onConfirmado={confirmar}
-                onVolver={() => setEtapa("carta")}
+                onVolver={alVolver}
               />
             ))}
         </motion.div>

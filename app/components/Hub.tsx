@@ -25,6 +25,7 @@ export function Hub({
   citaDeEsteCiclo,
   ciclo,
   numeroDeCumplemes,
+  cambioPendiente,
   onRuleta,
   onCarta,
 }: {
@@ -33,6 +34,8 @@ export function Hub({
   citaDeEsteCiclo: Cita | null;
   ciclo: string;
   numeroDeCumplemes: number;
+  /** Si todavía puede cambiar la cita de este mes. */
+  cambioPendiente: boolean;
   onRuleta: () => void;
   onCarta: () => void;
 }) {
@@ -83,7 +86,9 @@ export function Hub({
                 {citaDeEsteCiclo.titulo}
               </p>
               <p className="text-papel/50 mt-1 text-[13px]">
-                Tu cita de este mes. Toca para verla.
+                {cambioPendiente
+                  ? "Tu cita de este mes. Te queda un cambio."
+                  : "Tu cita de este mes. Toca para verla."}
               </p>
             </>
           ) : (

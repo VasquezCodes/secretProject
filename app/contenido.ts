@@ -11,7 +11,9 @@ export type ClaveIcono =
   | "postre"
   | "atardecer"
   | "arcade"
-  | "cena";
+  | "cena"
+  | "cine"
+  | "spa";
 
 export type Cita = {
   /** Se guarda en el historial. Nunca lo cambies una vez desplegado. */
@@ -87,6 +89,20 @@ export const CITAS: readonly Cita[] = [
     titulo: "Cena sorpresa",
     descripcion:
       "Yo elijo el restaurante y mantengo el menú y la ubicación en secreto hasta llegar.",
+  },
+  {
+    id: "cine-al-aire-libre",
+    icono: "cine",
+    titulo: "Cine al aire libre",
+    descripcion:
+      "Una función de Cinta Proyecciones bajo las estrellas. Yo saco las entradas por Passline y llevo la mantita.",
+  },
+  {
+    id: "tarde-de-spa",
+    icono: "spa",
+    titulo: "Tarde de spa",
+    descripcion:
+      "Voucher para una tarde de spa: masaje, manicure o pedicure. Tú eliges el lugar y el mimo, yo pago y te llevo.",
   },
 ];
 

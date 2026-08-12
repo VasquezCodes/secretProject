@@ -1,4 +1,6 @@
 import {
+  Clapperboard,
+  Flower2,
   Footprints,
   Gamepad2,
   IceCreamCone,
@@ -20,6 +22,8 @@ const ICONOS: Record<ClaveIcono, LucideIcon> = {
   atardecer: Sunset,
   arcade: Gamepad2,
   cena: UtensilsCrossed,
+  cine: Clapperboard,
+  spa: Flower2,
 };
 
 /**

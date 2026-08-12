@@ -12,9 +12,10 @@ import { CITAS, DIA_CUMPLEMES, fechaDeInicio, type Cita } from "./contenido";
 import {
   giroDelCiclo,
   guardar,
+  guardarGiro,
   instantanea,
   instantaneaServidor,
-  registrarGiro,
+  puedeGirarEnCiclo,
   suscribir,
 } from "./lib/almacenamiento";
 import {
@@ -49,19 +50,19 @@ export default function Pagina() {
   const [etapaElegida, setEtapaElegida] = useState<Etapa | null>(etapaForzada);
   const [citaForzada] = useState(() => parametroDeDesarrollo("cita"));
 
-  const confirmar = useCallback(
-    (cita: Cita) => {
+  /** Al parar la rueda. Guardar acá evita que recargar regale otro giro. */
+  const anotarGiro = useCallback(
+    (cita: Cita, gastaElCambio: boolean) => {
       if (!ahora) return;
 
       guardar(
-        registrarGiro(estado, {
+        guardarGiro(estado, {
           ciclo: idDeCiclo(ahora, DIA_CUMPLEMES),
           citaId: cita.id,
           fechaISO: ahora.toISOString(),
+          retiradaUsada: gastaElCambio,
         }),
       );
-
-      setEtapaElegida("premio");
     },
     [ahora, estado],
   );
@@ -84,9 +85,18 @@ export default function Pagina() {
       ? citaPorId(CITAS, citaForzada)
       : undefined;
 
-  // Si la cita guardada ya no existe en contenido.ts, se le devuelve el giro
-  // en vez de dejarla mirando una pantalla rota.
-  const puedeGirar = !giroDeEsteCiclo || !citaGanada;
+  /*
+   * Le queda giro si no ha girado este ciclo, o si giró pero todavía no gastó
+   * el cambio. Son dos giros por ciclo como máximo.
+   *
+   * Y si la cita guardada ya no existe en contenido.ts, se le devuelve el giro
+   * en vez de dejarla mirando una pantalla rota.
+   */
+  const puedeGirar = puedeGirarEnCiclo(estado, ciclo) || !citaGanada;
+
+  // El segundo giro del ciclo es el cambio, y es definitivo.
+  const esElCambio = giroDeEsteCiclo !== undefined;
+
   const haGirado = estado.giros.length > 0;
 
   /*
@@ -96,7 +106,10 @@ export default function Pagina() {
   const etapa: Etapa = etapaElegida ?? (giroDeEsteCiclo ? "hub" : "sobre");
 
   const alVolver = () => setEtapaElegida(haGirado ? "hub" : "carta");
-  const alJugar = () => setEtapaElegida(puedeGirar ? "ruleta" : "premio");
+
+  // Si ya tiene cita, primero se la enseña. Gastar el cambio se decide desde
+  // la pantalla del premio, nunca de un toque suelto.
+  const alJugar = () => setEtapaElegida(citaGanada ? "premio" : "ruleta");
 
   return (
     <main>
@@ -121,6 +134,7 @@ export default function Pagina() {
               citaDeEsteCiclo={citaGanada ?? null}
               ciclo={ciclo}
               numeroDeCumplemes={cumplemes}
+              cambioPendiente={Boolean(citaGanada) && puedeGirar}
               onRuleta={alJugar}
               onCarta={() => setEtapaElegida("carta")}
             />
@@ -140,7 +154,9 @@ export default function Pagina() {
             <Ruleta
               citas={CITAS}
               historial={estado.giros.filter((giro) => giro.ciclo !== ciclo)}
-              onConfirmado={confirmar}
+              ultimoGiro={esElCambio}
+              onGiro={anotarGiro}
+              onListo={() => setEtapaElegida("premio")}
               onVolver={alVolver}
             />
           )}
@@ -153,12 +169,17 @@ export default function Pagina() {
                 historial={estado.giros.filter((giro) => giro.ciclo !== ciclo)}
                 faltan={faltaPara(proximoCumplemes(ahora, DIA_CUMPLEMES), ahora)}
                 onVolver={() => setEtapaElegida("hub")}
+                onCambiar={
+                  puedeGirar ? () => setEtapaElegida("ruleta") : undefined
+                }
               />
             ) : (
               <Ruleta
                 citas={CITAS}
                 historial={estado.giros.filter((giro) => giro.ciclo !== ciclo)}
-                onConfirmado={confirmar}
+                ultimoGiro={esElCambio}
+                onGiro={anotarGiro}
+                onListo={() => setEtapaElegida("premio")}
                 onVolver={alVolver}
               />
             ))}

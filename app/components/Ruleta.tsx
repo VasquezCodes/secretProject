@@ -33,7 +33,7 @@ import { FondoNoche } from "./FondoNoche";
 const DURACION_GIRO = 6.2;
 const BOMBILLAS = 28;
 
-type Fase = "lista" | "girando" | "repetida" | "confirmada";
+type Fase = "lista" | "girando" | "decidiendo" | "confirmada";
 
 /** Parte el título en dos líneas para que entre en el gajo. */
 function dividirTitulo(titulo: string): string[] {
@@ -47,12 +47,20 @@ function dividirTitulo(titulo: string): string[] {
 export function Ruleta({
   citas,
   historial,
-  onConfirmado,
+  ultimoGiro,
+  onGiro,
+  onListo,
   onVolver,
 }: {
   citas: readonly Cita[];
+  /** Ciclos anteriores, solo para avisarle si le repitió una cita. */
   historial: readonly { citaId: string }[];
-  onConfirmado: (cita: Cita) => void;
+  /** Si este giro gasta el cambio del mes, y por tanto es definitivo. */
+  ultimoGiro: boolean;
+  /** Se llama al parar la rueda. El padre guarda el resultado. */
+  onGiro: (cita: Cita, gastaElCambio: boolean) => void;
+  /** Se llama cuando el resultado queda cerrado y hay que pasar al premio. */
+  onListo: (cita: Cita) => void;
   onVolver: () => void;
 }) {
   const reducirMovimiento = useReducedMotion();
@@ -60,7 +68,6 @@ export function Ruleta({
   const [fase, setFase] = useState<Fase>("lista");
   const [resultado, setResultado] = useState<Cita | null>(null);
   const [indiceGanador, setIndiceGanador] = useState<number | null>(null);
-  const [retiradaUsada, setRetiradaUsada] = useState(false);
   const [silenciado, setSilenciado] = useState(false);
 
   const rotacion = useMotionValue(0);
@@ -128,9 +135,9 @@ export function Ruleta({
         disableForReducedMotion: true,
       });
 
-      window.setTimeout(() => onConfirmado(cita), 1250);
+      window.setTimeout(() => onListo(cita), 1250);
     },
-    [onConfirmado],
+    [onListo],
   );
 
   const aterrizar = useCallback(
@@ -138,17 +145,26 @@ export function Ruleta({
       sonidosRef.current?.detenerGiro();
       setResultado(cita);
 
-      const repetida = yaSalio(historial, cita.id);
+      // Se guarda al parar, no al aceptar: si recarga a mitad de la decisión,
+      // el resultado sigue ahí y no se le regala un giro extra.
+      onGiro(cita, ultimoGiro);
 
-      if (repetida && !retiradaUsada) {
-        setFase("repetida");
+      if (ultimoGiro) {
+        confirmar(cita);
         return;
       }
 
-      confirmar(cita);
+      setFase("decidiendo");
     },
-    [confirmar, historial, retiradaUsada],
+    [confirmar, onGiro, ultimoGiro],
   );
+
+  /** Se queda con lo que salió. Eso gasta el cambio del mes. */
+  const quedarse = useCallback(() => {
+    if (!resultado) return;
+    onGiro(resultado, true);
+    confirmar(resultado);
+  }, [confirmar, onGiro, resultado]);
 
   const girar = useCallback(async () => {
     if (fase === "girando") return;
@@ -196,14 +212,6 @@ export function Ruleta({
     aterrizar(cita);
   }, [aterrizar, citas, fase, paso, reducirMovimiento, rotacion, total]);
 
-  function volverATirar() {
-    setRetiradaUsada(true);
-    setFase("lista");
-    setResultado(null);
-    setIndiceGanador(null);
-    void girar();
-  }
-
   const girando = fase === "girando";
 
   return (
@@ -233,14 +241,16 @@ export function Ruleta({
 
       <div className="relative flex flex-col items-center">
         <h2 className="text-papel text-center text-2xl font-semibold tracking-tight sm:text-3xl">
-          {fase === "repetida" ? "Esa ya la tenías" : "Tu cita de este mes"}
+          {fase === "decidiendo" ? "Te tocó" : "Tu cita de este mes"}
         </h2>
         <p className="text-papel/65 mt-2 h-5 text-center text-sm">
-          {fase === "repetida"
-            ? "Te queda una tirada más. Lo que salga, va."
-            : girando
-              ? "A ver dónde para"
-              : "Ninguna se deja ver hasta que para"}
+          {girando
+            ? "A ver dónde para"
+            : fase === "decidiendo"
+              ? ""
+              : ultimoGiro
+                ? "Este es tu cambio. Lo que salga, va."
+                : "Ninguna se deja ver hasta que para"}
         </p>
 
         <div className="relative mt-8 aspect-square w-[min(86vw,25rem)]">
@@ -413,21 +423,35 @@ export function Ruleta({
           </motion.div>
         </div>
 
-        <div className="mt-9 flex min-h-26 flex-col items-center">
-          {fase === "repetida" && resultado ? (
+        <div className="mt-9 flex min-h-40 flex-col items-center">
+          {fase === "decidiendo" && resultado ? (
             <>
-              <p className="text-papel/85 max-w-xs text-center text-[15px]">
-                Salió <span className="text-rosa-clara font-semibold">{resultado.titulo}</span>,
-                y esa ya te había tocado.
+              <p className="text-rosa-clara text-center text-xl font-semibold">
+                {resultado.titulo}
               </p>
-              <button
-                type="button"
-                onClick={volverATirar}
-                className="bg-rosa-honda text-papel mt-5 flex cursor-pointer items-center gap-2 rounded-full px-8 py-4 text-[15px] font-semibold shadow-[0_16px_30px_-14px_rgba(152,42,70,0.85)] transition-transform active:scale-[0.98]"
-              >
-                <RotateCcw size={17} strokeWidth={2.4} />
-                Tirar otra vez
-              </button>
+              <p className="text-papel/60 mt-1.5 max-w-xs text-center text-[13px]">
+                {yaSalio(historial, resultado.id)
+                  ? "Y esa ya te había tocado antes."
+                  : "Puedes quedártela o cambiarla. Una sola vez al mes."}
+              </p>
+
+              <div className="mt-5 flex flex-col items-center gap-3">
+                <button
+                  type="button"
+                  onClick={quedarse}
+                  className="bg-rosa-honda text-papel cursor-pointer rounded-full px-9 py-4 text-[15px] font-semibold shadow-[0_16px_30px_-14px_rgba(152,42,70,0.85)] transition-transform active:scale-[0.98]"
+                >
+                  Me quedo con esta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void girar()}
+                  className="text-papel/70 hover:text-papel flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-[14px] transition-colors"
+                >
+                  <RotateCcw size={16} strokeWidth={2.2} />
+                  Tirar otra vez
+                </button>
+              </div>
             </>
           ) : fase === "confirmada" && resultado ? (
             <p className="text-rosa-clara text-center text-xl font-semibold">
@@ -440,7 +464,7 @@ export function Ruleta({
               disabled={girando}
               className="bg-rosa-honda text-papel cursor-pointer rounded-full px-10 py-4 text-[15px] font-semibold shadow-[0_16px_30px_-14px_rgba(152,42,70,0.85)] transition-transform active:scale-[0.98] disabled:cursor-default disabled:opacity-55"
             >
-              {girando ? "Girando" : "Girar"}
+              {girando ? "Girando" : ultimoGiro ? "Tirar el cambio" : "Girar"}
             </button>
           )}
         </div>

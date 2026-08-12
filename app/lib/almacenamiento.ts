@@ -17,6 +17,14 @@ export type Giro = {
   ciclo: string;
   citaId: string;
   fechaISO: string;
+  /**
+   * Si ya gastó el cambio de este ciclo, sea tirando otra vez o quedándose
+   * con lo que salió. Mientras esté en `false` puede volver a girar.
+   *
+   * Esto vive en el almacenamiento y no en memoria a propósito: si viviera en
+   * memoria, recargar la página daría giros infinitos.
+   */
+  retiradaUsada: boolean;
 };
 
 export type Estado = {
@@ -58,6 +66,21 @@ function esEstadoValido(valor: unknown): valor is Estado {
   );
 }
 
+/**
+ * `retiradaUsada` se agregó después de que la app ya estaba en sus manos.
+ * Un giro guardado antes no lo trae, y se le da el beneficio de la duda: se
+ * asume que todavía le queda el cambio. Nunca se descarta su giro por esto.
+ */
+function normalizar(estado: Estado): Estado {
+  return {
+    ...estado,
+    giros: estado.giros.map((giro) => ({
+      ...giro,
+      retiradaUsada: giro.retiradaUsada === true,
+    })),
+  };
+}
+
 export function leer(): Estado {
   const almacen = almacenDisponible();
   if (!almacen) return enMemoria;
@@ -73,7 +96,7 @@ export function leer(): Estado {
       return ESTADO_VACIO;
     }
 
-    return parseado;
+    return normalizar(parseado);
   } catch {
     return ESTADO_VACIO;
   }
@@ -146,13 +169,28 @@ export function suscribir(oyente: () => void): () => void {
   };
 }
 
-/** Registra el giro del ciclo. Si el ciclo ya tenía giro, no lo pisa. */
-export function registrarGiro(estado: Estado, giro: Giro): Estado {
-  if (estado.giros.some((previo) => previo.ciclo === giro.ciclo)) {
-    return estado;
-  }
+/**
+ * Guarda el giro del ciclo, pisando el que hubiera.
+ *
+ * Pisar es justo lo que hace falta: el cambio del mes reemplaza el resultado
+ * anterior. Quien decide si un ciclo admite otro giro es `puedeGirar()`, no
+ * esta función.
+ */
+export function guardarGiro(estado: Estado, giro: Giro): Estado {
+  const otros = estado.giros.filter((previo) => previo.ciclo !== giro.ciclo);
+  return { ...estado, giros: [...otros, giro] };
+}
 
-  return { ...estado, giros: [...estado.giros, giro] };
+/**
+ * Si el ciclo todavía admite un giro.
+ *
+ * Sin giro, le toca el del mes. Con un giro cuyo cambio sigue sin gastar, le
+ * queda la re-tirada. Son dos giros por ciclo como máximo, y ni recargar la
+ * página da más, porque el contador vive en el almacenamiento.
+ */
+export function puedeGirarEnCiclo(estado: Estado, ciclo: string): boolean {
+  const giro = giroDelCiclo(estado, ciclo);
+  return giro === undefined || !giro.retiradaUsada;
 }
 
 /** El giro de un ciclo concreto, si ya se jugó. */

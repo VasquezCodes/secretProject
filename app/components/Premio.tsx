@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
 
 import { CITAS, type Cita } from "../contenido";
@@ -24,12 +24,15 @@ export function Premio({
   historial,
   faltan,
   onVolver,
+  onCambiar,
 }: {
   cita: Cita;
   numeroDeCumplemes: number;
   historial: readonly Giro[];
   faltan: TiempoJuntos;
   onVolver: () => void;
+  /** Ausente si ya gastó el cambio de este mes. */
+  onCambiar?: () => void;
 }) {
   const reducirMovimiento = useReducedMotion();
   const porDescubrir = citasNoDescubiertas(
@@ -80,6 +83,17 @@ export function Premio({
             Te la debo. Vale por una cita.
           </p>
         </div>
+
+        {onCambiar && (
+          <button
+            type="button"
+            onClick={onCambiar}
+            className="text-papel/70 hover:text-papel mt-5 flex cursor-pointer items-center gap-2 rounded-full px-4 py-2 text-[14px] transition-colors"
+          >
+            <RotateCcw size={16} strokeWidth={2.2} />
+            Cambiarla, te queda un cambio
+          </button>
+        )}
 
         <div className="mt-10 text-center">
           <p className="text-papel/65 text-[13px]">

@@ -297,9 +297,16 @@ export function Ruleta({
 
               {citas.map((cita, i) => {
                 const angulo = centroDeGajo(i, total);
-                const invertir = angulo > 90 && angulo < 270;
                 // Ninguna cita se deja ver hasta que la rueda para en ella.
                 const revelada = indiceGanador === i && fase !== "girando";
+
+                /*
+                 * El volteo mantiene legibles las etiquetas de la mitad de
+                 * abajo mientras la rueda está en reposo. Al ganador no se le
+                 * aplica: la rueda siempre lo aparca arriba, así que voltearlo
+                 * lo dejaría cabeza abajo justo cuando ella lo va a leer.
+                 */
+                const invertir = !revelada && angulo > 90 && angulo < 270;
                 const lineas = dividirTitulo(cita.titulo);
 
                 return (

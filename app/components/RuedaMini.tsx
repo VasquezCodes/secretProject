@@ -60,7 +60,8 @@ export function RuedaMini({
           {citas.map((cita, i) => {
             const revelada = indiceGanador === i;
             const angulo = centroDeGajo(i, total);
-            const invertir = angulo > 90 && angulo < 270;
+            // Al ganador nunca: la rueda lo deja aparcado arriba, derecho.
+            const invertir = !revelada && angulo > 90 && angulo < 270;
 
             return (
               <g key={cita.id}>

@@ -68,8 +68,11 @@ El texto es fijo y vive en `contenido.ts`. No lleva placeholders.
 | `arcades-retro` | 🕹️ | Arcades retro | Sala de videojuegos antiguos. Competimos por la puntuación más alta. |
 | `cena-sorpresa` | 🍽️ | Cena sorpresa | Yo elijo el restaurante y mantengo el menú y la ubicación en secreto hasta llegar. |
 
-Candidata para agregar más adelante: **Cine bajo las estrellas** (autocine o proyección al aire
-libre). Se dejó fuera por depender de que exista una función cerca.
+Candidata inmediata para el próximo ciclo: **Cine bajo las estrellas** (autocine o proyección al aire
+libre). Se dejó fuera del arranque por depender de que exista una función cerca.
+
+**El pool crece: cada mes se agregan 2 citas nuevas** editando este mismo archivo (`contenido.ts`).
+El resto de la app se adapta sola — ver "Crecimiento del pool" y "Densidad de la rueda".
 
 ## Arquitectura
 
@@ -169,9 +172,15 @@ En el peor caso ella puede girar de más. Eso es preferible a que vea una pantal
      repetido o no.
 5. Se guarda un único registro por ciclo: `{ ciclo, citaId, fechaISO }` con el resultado definitivo.
 
-**Consecuencia conocida y aceptada:** a partir del ciclo 6, cuando ya salieron las 5 citas, todo
-resultado es repetido y por lo tanto siempre se habilita la re-tirada. La mecánica sigue siendo
-consistente. Se diluye a medida que el usuario agregue citas nuevas, que es el plan.
+### Crecimiento del pool
+
+El plan es **agregar 2 citas nuevas cada mes**. Como se consume 1 por ciclo, el pool crece neto: en
+el ciclo *n* el total es `5 + 2(n-1)` y quedan `n + 3` citas sin descubrir. **El pool nunca se
+agota**, así que no hace falta lógica de rebarajado.
+
+La probabilidad de que el primer giro caiga en una repetida es `n / (5 + 2(n-1))`: 0% el ciclo 1,
+~14% el 2, ~33% el 6, y tiende a ~50% a largo plazo. La re-tirada queda como un evento ocasional,
+que es la intención.
 
 ## Flujo de datos
 
@@ -213,6 +222,20 @@ Si en el futuro hiciera falta, se puede agregar sin rehacer nada.
 - Confeti al confirmarse el premio.
 - El cupón tiene forma de ticket, con el emoji, el título, la descripción, la fecha y el número de
   cumplemes. Está pensado para que ella le saque captura de pantalla.
+
+### Densidad de la rueda
+
+La rueda tiene un gajo por cita, y el pool crece 2 por mes: 5 gajos el ciclo 1, 15 el ciclo 6, 27 el
+ciclo 12. A 375px de ancho el texto deja de entrar mucho antes de eso, así que la rueda se diseña
+para degradar sola según la cantidad de citas `N`:
+
+- `N <= 8` — emoji + título corto dentro del gajo.
+- `N <= 16` — solo el emoji. El título aparece al parar, sobre la rueda y en el cupón.
+- `N > 16` — la rueda deja de ser el formato adecuado. Está **fuera de alcance de esta versión**;
+  cuando se acerque ese punto (alrededor del ciclo 7) se revisita con otra presentación, por ejemplo
+  un carrusel tipo tragamonedas. La lógica de sorteo no cambia, solo la capa visual.
+
+El componente `Ruleta` elige el modo a partir de `N`; no hay que tocarlo al agregar citas.
 - Se respeta `prefers-reduced-motion`: sin confeti, sin corazones, la rueda salta al resultado y el
   texto aparece completo.
 

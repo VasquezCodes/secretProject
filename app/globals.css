@@ -1,26 +1,126 @@
 @import "tailwindcss";
 
+/*
+ * Paleta sacada de las fotos de ellos, no de un repertorio genérico de
+ * romanticismo: mesas de restaurante de noche, madera oscura, luz cálida.
+ * El rosa es el de las cerezas de su camiseta.
+ *
+ * El rosa es el ÚNICO acento. Sus tres tonos no son tres acentos: son el
+ * mismo color calibrado para tres trabajos distintos, y cada uno está donde
+ * está para que el contraste pase AA.
+ *
+ *   rosa        decorativo (aro, clavijas, bombillas, sello)
+ *   rosa-honda  fondo de botones, con texto papel encima
+ *   rosa-clara  texto rosa sobre fondo oscuro
+ */
+@theme {
+  --color-tinta: #2a1e1a;
+  --color-papel: #f5e7e0;
+  --color-papel-alto: #fbf3ee;
+  --color-noche: #1b1210;
+  --color-noche-alto: #2a1c18;
+  --color-rosa: #c4415f;
+  --color-rosa-honda: #982a46;
+  --color-rosa-clara: #e8778f;
+  --color-humo: #8a6f66;
+
+  --font-display: var(--font-bricolage), ui-sans-serif, system-ui, sans-serif;
+  --font-carta: var(--font-garamond), ui-serif, Georgia, serif;
+
+  --radius-suave: 14px;
+}
+
+/*
+ * Esto es un objeto de diseño fijo, como una postal impresa: no se invierte
+ * con el tema del sistema. La app hace su propio cambio de luz a oscuridad
+ * como parte del relato (papel de día, noche de fiesta).
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: only light;
+
+  /*
+   * Gajos de la rueda. Se ciclan por índice; ver tonoDeGajo(). Tienen que
+   * diferenciarse entre sí a simple vista, o la rueda se lee como un disco
+   * negro, y quedarse oscuros para que las incógnitas encima contrasten.
+   *
+   * Van acá y no en `@theme` a propósito: Tailwind descarta las variables de
+   * `@theme` que ninguna clase utility usa, y estas solo se leen desde `var()`
+   * dentro del SVG. En `@theme` no llegaban al navegador y los gajos salían
+   * negros.
+   */
+  --color-gajo-a: #6b4038;
+  --color-gajo-b: #4a2233;
+  --color-gajo-c: #7d4a52;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  margin: 0;
+  background-color: var(--color-noche);
+  color: var(--color-tinta);
+  font-family: var(--font-display);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
+}
+
+/* El foco tiene que verse siempre, también sobre el fondo oscuro. */
+:focus-visible {
+  outline: 2px solid var(--color-rosa);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Las bombillas del aro corren mientras la rueda gira. */
+@keyframes bombilla-corre {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Los corazones del fondo suben despacio y se desvanecen. */
+@keyframes corazon-sube {
+  0% {
+    transform: translate3d(0, 12vh, 0) scale(0.7) rotate(-8deg);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  88% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate3d(var(--deriva, 3vw), -95vh, 0) scale(1) rotate(10deg);
+    opacity: 0;
+  }
+}
+
+/* El papel de la carta respira apenas, como una hoja sobre la mesa. */
+@keyframes papel-respira {
+  0%,
+  100% {
+    transform: rotate(-0.35deg);
+  }
+  50% {
+    transform: rotate(0.35deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
 }

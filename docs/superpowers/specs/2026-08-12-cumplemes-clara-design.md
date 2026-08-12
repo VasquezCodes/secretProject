@@ -10,7 +10,7 @@ lo toca, se despliega una carta con un mensaje y un contador en vivo del tiempo 
 y después gira una ruleta que le otorga una cita real que él se compromete a cumplir.
 
 Se repite **cada 12 del mes** (empezaron el 12 de julio de 2026). Cada ciclo mensual habilita
-exactamente un giro. Entre ciclos, ella ve su cupón vigente, el historial de cupones anteriores y
+exactamente un giro. Entre ciclos, ella ve su premio vigente, el historial de premios anteriores y
 una cuenta regresiva al próximo 12.
 
 **Primer ciclo: 12 de agosto de 2026 (hoy).** El deadline de la primera entrega es hoy.
@@ -54,48 +54,59 @@ Una sola ruta: `/`.
 > Te volviste importante en mi vida mucho más rápido de lo que esperaba, y no me da miedo decirlo:
 > te amo, Clara.
 >
-> Feliz primer mes. Ahora gira la ruleta, que te debo una cita. 💛
+> Feliz primer mes. Ahora gira la ruleta, que te debo una cita.
 
-El texto es fijo y vive en `contenido.ts`. No lleva placeholders.
+El texto es fijo y vive en `contenido.ts`. No lleva placeholders. La firma al pie también sale de
+`contenido.ts` (`FIRMA`), en Garamond itálica.
 
 ### Las 5 citas
 
-| id | Emoji | Título | Descripción (va en el cupón) |
+Sin emoji en ningún lado: los iconos son de Lucide.
+
+| id | Clave de icono | Lucide | Título |
 |---|---|---|---|
-| `turistas-locales` | 🗺️ | Turistas locales | Elegimos un barrio histórico que no frecuentamos y lo recorremos a pie, sin usar mapas. |
-| `ruta-del-postre` | 🍰 | Ruta del postre | Nos saltamos la cena. Tres lugares distintos, solo para probar su postre o helado estrella. |
-| `picnic-nocturno` | 🧺 | Pícnic nocturno | Canasta con quesos y bebidas, un parque iluminado o un mirador, y el atardecer. |
-| `arcades-retro` | 🕹️ | Arcades retro | Sala de videojuegos antiguos. Competimos por la puntuación más alta. |
-| `cena-sorpresa` | 🍽️ | Cena sorpresa | Yo elijo el restaurante y mantengo el menú y la ubicación en secreto hasta llegar. |
+| `turistas-locales` | `caminata` | `Footprints` | Turistas locales |
+| `ruta-del-postre` | `postre` | `IceCreamCone` | Ruta del postre |
+| `picnic-nocturno` | `atardecer` | `Sunset` | Pícnic nocturno |
+| `arcades-retro` | `arcade` | `Gamepad2` | Arcades retro |
+| `cena-sorpresa` | `cena` | `UtensilsCrossed` | Cena sorpresa |
 
 Candidata inmediata para el próximo ciclo: **Cine bajo las estrellas** (autocine o proyección al aire
 libre). Se dejó fuera del arranque por depender de que exista una función cerca.
 
 **El pool crece: cada mes se agregan 2 citas nuevas** editando este mismo archivo (`contenido.ts`).
-El resto de la app se adapta sola — ver "Crecimiento del pool" y "Densidad de la rueda".
+El resto de la app se adapta sola. Ver "Crecimiento del pool" y "Los gajos no dicen qué son".
 
 ## Arquitectura
 
 ```
 app/
   contenido.ts          Todo el contenido editable: datos, mensaje, citas
+  iconos.tsx            Clave de icono -> componente Lucide
   layout.tsx            Metadata, fuentes
   globals.css           Tema y tokens de color
   page.tsx              Orquestador de etapas
   components/
     Sobre.tsx           Sobre cerrado, se abre al tocar
-    Carta.tsx           Mensaje + contador en vivo
-    ContadorJuntos.tsx  Días/horas/minutos/segundos desde la fecha de inicio
+    Carta.tsx           Mensaje + retrato + contador en vivo
+    Contador.tsx        Días/horas/minutos/segundos (tiempo juntos y espera)
+    Corazones.tsx       Corazones que suben detrás de la carta
+    FondoNoche.tsx      Foto de mesa desenfocada como atmósfera
     Ruleta.tsx          La rueda, el giro y la re-tirada
-    Cupon.tsx           El "vale por..." estilo ticket
-    Historial.tsx       Cupones de meses anteriores
-    CuentaRegresiva.tsx Tiempo hasta el próximo 12
-    Corazones.tsx       Fondo animado
+    Premio.tsx          La tarjeta de la cita y la cuenta regresiva
+    Historial.tsx       Citas de meses anteriores
   lib/
     cumplemes.ts        Lógica de fechas (funciones puras)
     premios.ts          Sorteo y consulta de historial (funciones puras)
-    almacenamiento.ts   Lectura/escritura de localStorage a prueba de fallos
+    rueda.ts            Geometría de la rueda (funciones puras)
+    almacenamiento.ts   localStorage a prueba de fallos + store externo
+    sonido.ts           El clac de las clavijas, con Web Audio
+    reloj.ts            useAhora() y los atajos de desarrollo
 ```
+
+Las cuatro primeras de `lib/` son puras: no importan React ni tocan el DOM, y por eso son las que
+tienen tests. Los componentes no calculan fechas, ni sortean, ni resuelven geometría: reciben
+resultados ya computados.
 
 La lógica pura (`cumplemes.ts`, `premios.ts`) no importa React ni toca el DOM. Los componentes no
 calculan fechas ni sortean: reciben resultados ya computados.
@@ -106,8 +117,8 @@ calculan fechas ni sortean: reciben resultados ya computados.
 
 - `sobre` → `carta`: ella toca el sobre.
 - `carta` → `ruleta`: ella toca "Girar la ruleta". Solo se ofrece si el ciclo actual está desbloqueado.
-- `ruleta` → `cupon`: termina la animación y el premio queda confirmado.
-- Si el ciclo actual **ya fue jugado**, al abrir la app va directo de `sobre` → `carta` → `cupon`
+- `ruleta` → `premio`: termina la animación y el premio queda confirmado.
+- Si el ciclo actual **ya fue jugado**, al abrir la app va directo de `sobre` → `carta` → `premio`
   (con historial y cuenta regresiva), sin pasar por `ruleta`.
 
 ## Módulos
@@ -164,9 +175,9 @@ En el peor caso ella puede girar de más. Eso es preferible a que vea una pantal
 3. La rueda se anima **hacia** el resultado ya elegido: se calcula el ángulo destino a partir del
    índice del gajo, se le suman 6–8 vueltas completas, y se aplica una transición de ~5s con
    desaceleración. Nunca se deduce el premio de dónde quedó la rueda — eso garantiza que la
-   animación y el cupón jamás se desincronicen.
+   animación y la tarjeta jamás se desincronicen.
 4. Al terminar la transición:
-   - **Si la cita no había salido nunca** → es definitiva. Confeti, cupón, se guarda.
+   - **Si la cita no había salido nunca** → es definitiva. Confeti, tarjeta, se guarda.
    - **Si ya había salido en un ciclo anterior** → se le ofrece **una re-tirada**, una sola vez.
      La re-tirada es otro sorteo de azar puro sobre las 5. Su resultado es **definitivo**, salga
      repetido o no.
@@ -195,7 +206,7 @@ localStorage ──> almacenamiento.leer() ──> Estado
                                     sí                    no
                                      │                    │
                                      ▼                    ▼
-                             Cupón + Historial      Ruleta habilitada
+                            Tarjeta + Historial     Ruleta habilitada
                              + Cuenta regresiva            │
                                                   premios.sortear()
                                                            │
@@ -208,36 +219,115 @@ localStorage ──> almacenamiento.leer() ──> Estado
 ## Diseño visual
 
 **Decisión: Tailwind puro, sin shadcn/ui.** Se evaluó shadcn y se descartó. Las piezas centrales de
-esta interfaz (sobre, ruleta, cupón-ticket, corazones) son todas custom y shadcn no aporta ninguna;
-usarlo significaría instalar Radix y su sistema de tokens para aprovechar, a lo sumo, un botón.
-Además su estética neutra de producto empuja en la dirección opuesta a la que busca este proyecto.
-Si en el futuro hiciera falta, se puede agregar sin rehacer nada.
+esta interfaz (sobre, ruleta, tarjeta de premio, corazones) son todas custom y shadcn no aporta
+ninguna; usarlo significaría instalar Radix y su sistema de tokens para aprovechar, a lo sumo, un
+botón. Además su estética neutra de producto empuja en la dirección opuesta a la que busca este
+proyecto. Si en el futuro hiciera falta, se puede agregar sin rehacer nada.
 
-Única dependencia nueva prevista: `canvas-confetti`. Las fuentes se cargan con `next/font`.
+Dependencias nuevas: `motion` (transiciones y elemento compartido), `canvas-confetti`,
+`@phosphor-icons/react`. Las fuentes se cargan con `next/font`.
+
+### Paleta
+
+Derivada de las fotos reales de la pareja, no de un repertorio genérico de romanticismo. Las fotos
+son todas mesas de restaurante de noche: madera oscura, luz cálida, y el rosa de las cerezas de la
+camiseta de ella.
+
+| Token | Hex | Uso |
+|---|---|---|
+| `--color-tinta` | `#2a1e1a` | Marrón casi negro. Texto sobre papel. |
+| `--color-papel` | `#f5e7e0` | Papel con tinte rosado. Fondo de sobre y carta. |
+| `--color-papel-alto` | `#fbf3ee` | Papel elevado: la carta, la solapa del sobre. |
+| `--color-noche` | `#1b1210` | Fondo de las etapas de ruleta y premio. |
+| `--color-rosa` | `#c4415f` | Acento decorativo: aro, clavijas, bombillas, sello. |
+| `--color-rosa-honda` | `#982a46` | Fondo de botones, con texto papel encima. |
+| `--color-rosa-clara` | `#e8778f` | Texto rosa sobre fondo oscuro. |
+| `--color-humo` | `#8a6f66` | Texto secundario sobre papel. |
+
+Los tres rosas no son tres acentos: son el mismo color calibrado para tres trabajos, y cada uno está
+donde está para que el contraste pase WCAG AA. Concretamente, texto `papel` sobre `rosa` da 4.1:1 y
+no alcanza para texto pequeño, así que los botones usan `rosa-honda` (6.4:1).
+
+Descartes deliberados:
+
+- **El amarillo dorado** que tenía la primera versión. A Clara no le gusta el amarillo.
+- **La familia crema `#FFF8F0` + dorado apagado**: es el reflejo por defecto de todo diseño generado
+  por IA y no dice nada de esta pareja en particular.
+
+**Los tonos de los gajos (`--color-gajo-a/b/c`) van en `:root`, no en `@theme`.** Tailwind descarta
+las variables de `@theme` que ninguna clase utility usa, y estas solo se leen desde `var()` dentro
+del SVG. En `@theme` no llegaban al navegador y la rueda salía negra.
+
+### Tipografía
+
+- **Bricolage Grotesque** (display, botones, la rueda). Irregularidad deliberada; se lee hecho a mano
+  sin caer en lo cursi.
+- **EB Garamond** (la carta y la firma en itálica). El objeto es una carta, así que se compone como
+  una carta, no como una interfaz.
+
+Se descartó Fraunces, que era el primer instinto y es la display serif por defecto de todo diseño
+generado por IA en este momento.
+
+### Elemento distintivo: la rueda de feria
+
+La rueda es lo único ruidoso de la app; todo lo demás queda callado alrededor. Lo que hace emocionar
+a una ruleta real no es el giro, es el **clac-clac-clac** que se va espaciando mientras frena. Casi
+ninguna ruleta web lo implementa, y por eso se sienten muertas.
+
+- Clavijas en el aro, y una lengüeta que se flexiona de verdad al pasar cada clavija.
+- Sonido de clac generado con la Web Audio API (osciladores, sin archivos de audio). Con control de
+  silencio. Se inicializa en el toque de "Girar", que es el gesto de usuario que exigen los
+  navegadores móviles para reproducir audio.
+- Bombillas alrededor del aro que corren durante el giro y destellan al parar.
+- Curva de frenado con cola larga, para que el último gajo se decida temblando.
+
+**El premio sale de la propia rueda:** al frenar, el gajo ganador se enciende y revela su cita, y de
+ahí se pasa a la tarjeta. No se inventa un objeto nuevo para el premio.
+
+La ruleta lleva dos controles discretos en las esquinas: **Volver** a la izquierda, que regresa a la
+carta, y el silenciador a la derecha. Volver se desactiva en cuanto la rueda arranca: el giro del mes
+ya se está jugando y salirse a mitad dejaría el resultado a medias.
+
+Si la cita salió repetida, la tarjeta se voltea sola ("Esa ya la tenías") y aparece el botón de
+re-tirada. Ese golpe de decepción y segunda oportunidad es mejor minijuego que acertar a la primera.
+
+### Fotos
+
+Cinco fotos reales en `public/fotos/`. Se renombran a minúsculas con nombres descriptivos: Vercel
+corre en Linux y las rutas con mayúsculas fallan ahí sin fallar en Windows. Todas se sirven con
+`next/image`.
+
+- Retrato de ella: pegado arriba de la carta, ligeramente girado, como con cinta.
+- Fotos de mesa: fondo desenfocado y oscurecido en las etapas de sobre, ruleta y premio. Nunca
+  compiten con el contenido.
 
 - Mobile-first. Se verifica a 375px de ancho antes que en escritorio.
 - Paleta cálida: durazno, crema, dorado suave. Fondo con corazones flotando.
 - Tipografía con carácter para los títulos, legible para el cuerpo del mensaje.
 - El mensaje de la carta aparece escribiéndose, con un ritmo que se pueda saltar tocando la pantalla.
 - Confeti al confirmarse el premio.
-- El cupón tiene forma de ticket, con el emoji, el título, la descripción, la fecha y el número de
-  cumplemes. Está pensado para que ella le saque captura de pantalla.
+- La tarjeta de premio nace del gajo ganador y lleva el icono, el título, la descripción, la fecha y
+  el número de cumplemes. Está pensada para que ella le saque captura de pantalla.
 
-### Densidad de la rueda
-
-La rueda tiene un gajo por cita, y el pool crece 2 por mes: 5 gajos el ciclo 1, 15 el ciclo 6, 27 el
-ciclo 12. A 375px de ancho el texto deja de entrar mucho antes de eso, así que la rueda se diseña
-para degradar sola según la cantidad de citas `N`:
-
-- `N <= 8` — emoji + título corto dentro del gajo.
-- `N <= 16` — solo el emoji. El título aparece al parar, sobre la rueda y en el cupón.
-- `N > 16` — la rueda deja de ser el formato adecuado. Está **fuera de alcance de esta versión**;
-  cuando se acerque ese punto (alrededor del ciclo 7) se revisita con otra presentación, por ejemplo
-  un carrusel tipo tragamonedas. La lógica de sorteo no cambia, solo la capa visual.
-
-El componente `Ruleta` elige el modo a partir de `N`; no hay que tocarlo al agregar citas.
 - Se respeta `prefers-reduced-motion`: sin confeti, sin corazones, la rueda salta al resultado y el
   texto aparece completo.
+
+### Los gajos no dicen qué son
+
+Ningún gajo muestra su cita: todos llevan un **signo de interrogación** hasta que la rueda para. Solo
+el ganador se revela, con su icono y su título, y se enciende en `rosa-honda` con borde `rosa-clara`.
+
+Eso sostiene el suspenso, que es el punto del minijuego, y de paso resuelve un problema que quedaba
+abierto: el pool crece 2 citas por mes (5 gajos el ciclo 1, 15 el ciclo 6, 27 el ciclo 12) y a 375px
+de ancho los títulos dejan de entrar mucho antes de eso. Una incógnita siempre entra, por angosto que
+sea el gajo. Solo hay que achicarla, y de eso se encarga `tamanoDeIncognita(total)`.
+
+No hay nada que tocar al agregar citas.
+
+### Iconos
+
+Lucide (`lucide-react`), nunca emoji. Las citas guardan una clave semántica en `contenido.ts` y
+`iconos.tsx` la traduce a componente, así que agregar una cita no obliga a tocar imports.
 
 ## Verificación
 
@@ -256,7 +346,7 @@ Hace falta instalar un runner (Vitest) — el proyecto no tiene ninguno.
 un `ahora` distinto para simular meses futuros sin esperar. El override solo se lee cuando
 `process.env.NODE_ENV !== "production"`.
 
-Checklist manual: abrir el sobre, leer la carta, girar, ver el cupón, recargar la página y confirmar
+Checklist manual: abrir el sobre, leer la carta, girar, ver el premio, recargar la página y confirmar
 que ya no deja girar, simular el mes siguiente y confirmar que vuelve a habilitarse.
 
 ## Fuera de alcance
